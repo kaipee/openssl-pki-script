@@ -59,12 +59,12 @@ Enter a number: " PROJECT_INPUT
 
     case "$PROJECT_INPUT" in
       1 )
-        PROJECT='dnm';
-        PROJECT_UPPER='DNM';
+        PROJECT='project_name_1';
+        PROJECT_UPPER='PROJECT_NAME_1';
         break;;
       2 )
-        PROJECT='totus';
-        PROJECT_UPPER='TOTUS';
+        PROJECT='project_name_2';
+        PROJECT_UPPER='PROJECT_NAME_2';
         break;;
       * ) ;;
     esac
