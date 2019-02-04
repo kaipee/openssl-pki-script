@@ -84,7 +84,7 @@ elif [[ "$CERT_INPUT" == 'server' ]]; then
 
   chooseProject;
 
-  read -p "Please enter the server FQDN (Example: snoopi.something.kelvatek.com): " SERVER
+  read -p "Please enter the server FQDN (Example: www.google.com): " SERVER
 
   DIR="../server_certs"; # Servers working directory path relative to this script
   PROJECT_DIR="$DIR/$PROJECT";
