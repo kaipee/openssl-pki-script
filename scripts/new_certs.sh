@@ -1,19 +1,16 @@
 #! /bin/bash
 
-# Author:       Keith Patton
-# Created:      2019-01
-# Brief:        A BASH script to generate:
-#               * password-protected Root Certificate Authority; key, CSR and self-signed certificate
-#               * (per-project) Intermediate Certificate Authority; key, CSR and certificate (signed by Root CA)
-#               * (multiple) Server SSL Certificate; key, CSR and certificate (signed by per-project Intermediate CA)
- 
-# Defaults:     certificate directory   {DIR}/certs/
-#               private keys directory  {DIR}/private/
-#               serial number record    {DIR}/serial
-#               issued certs record     {DIR}/index.txt
-#               Certificate Revocation List     {DIR}/crl/crl.pem
-#               key bitsize: 4096 (Root), 2048 (Int), 1024 (Server)
-#               key expiry: 30 years (Root) 10 years (Int) 5 years (Server)
+# Author:	Keith Patton
+# Created:	2018-12
+# Brief:	A BASH script to generate password-protected Root Certificate Authority; key, CSR and certificate
+#
+# Defaults:	working directory		certificate_authority/ca/{CA_LEVEL}
+#		certificate directory		certificate_authority/ca/{CA_LEVEL}/certs
+#		private keys directory		certificate_authority/ca/{CA_LEVEL}/private
+#		serial number record		certificate_authority/ca/{CA_LEVEL}/serial
+#		issued certs record		certtificate_authority/ca/{CA_LEVEL}/index.txt
+#		key bitsize 4096
+#		key expiry 30 years
 
 
 ## SET THE SCRIPT TO CREATE EITHER ROOT OR INTERMEDIATE CERTS
@@ -35,6 +32,7 @@ while true; do
       DIR='../ca/intermediate';
       CNF="$DIR/openssl_${CERT_INPUT}.cnf"
       KEY_ROOT="../ca/root/private/root.ca.key.pem"; # Define the relative path and filename of the Root CA Private Key (used for signing Intermediate CSR)
+      CRT_ROOT="../ca/root/private/root.ca.crt.pem"; # Define the relative path and filename of the Root CA certificate (for creating chain)
       DEF_KEY_SIZE="2048";
       break;;
     server )
@@ -47,27 +45,26 @@ while true; do
 done
 
 
-## OBTAIN THE CURRENT PROJECT NAME IF CREATING INTERMEDIATE CERTIFICATES
+## OBTAIN THE CURRENT PROJECT NAME IF CREATING INTERMEDIATE CERTIFICATES (DNM, TOTUS, etc.)
 function chooseProject() {
   while true; do
     clear
 
     read -p \
 "Please choose a project name from the list below.
-1) PROJECT 1
-2) PROJECT 2
-....etc.
+1) DNM
+2) TOTUS
 
 Enter a number: " PROJECT_INPUT  
 
     case "$PROJECT_INPUT" in
       1 )
-        PROJECT='project_1';
-        PROJECT_UPPER='PROJECT_1';
+        PROJECT='dnm';
+        PROJECT_UPPER='DNM';
         break;;
       2 )
-        PROJECT='project_2';
-        PROJECT_UPPER='PROJECT_2';
+        PROJECT='totus';
+        PROJECT_UPPER='TOTUS';
         break;;
       * ) ;;
     esac
@@ -87,7 +84,7 @@ elif [[ "$CERT_INPUT" == 'server' ]]; then
 
   chooseProject;
 
-  read -p "Please enter the server FQDN (Example: something.tld.com): " SERVER
+  read -p "Please enter the server FQDN (Example: snoopi.something.kelvatek.com): " SERVER
 
   DIR="../server_certs"; # Servers working directory path relative to this script
   PROJECT_DIR="$DIR/$PROJECT";
@@ -107,12 +104,12 @@ if [ ! -d "$DIR" ]; then
 
   # Print error if 'ca/root' or 'ca/intermediate' directory is not available
   printf "Looks like you aren't executing this script from the correct directory, or directory "$DIR" does not exist!\n"
-  printf "This script should be executed from within openssl_pki_tool/scripts/\n\n"
+  printf "This script should be executed from within camln_certificate_authority/scripts/\n\n"
   printf "Directory structure MUST reflect the following layout...\n\n"
   
   # Print the correct directory structure
 cat <<EOF
-openssl_pki_tool/
+certificate_authority/
 ├── ca
 │   ├── intermediate
 │   │   ├── certs
@@ -131,6 +128,7 @@ openssl_pki_tool/
 ├── README.md
 ├── scripts
 │   ├── new_ca_certs.sh ## THIS SCRIPT
+│   └── new_server_certs.sh
 ├── server_certs
 │   ├── {PROJECT} # PROJECT SPECIFIC WORKING DIRECTORY
 │   │   ├── certs
@@ -155,7 +153,7 @@ fi
 case "$CERT_INPUT" in
   int ) 
     # Set the SSL commonName to that of the project (revert at end of script)
-    sed -i "s#_change_me_commonName_#$PROJECT_UPPER Inter CA#g" $CNF;;
+    sed -i "s#_change_me_commonName_#Inter CA $PROJECT_UPPER#g" $CNF;;
   server )
     # Modify the openssl_server.cnf file with variable values from user input (revert at end of script)
     sed -i "s#_change_me_dir_#$PROJECT_DIR#g" $CNF;
@@ -192,6 +190,10 @@ fi
 if [ -f "$KEY" ]; then
   mv "$KEY" "${KEY}_$(date '+%F_%T').pem"
 fi
+# Check if any previous CHAIN exist and create a backup
+if [ -f "$DIR/chain/${PROJECT}.chain.pem" ]; then
+  mv "$DIR/chain/${PROJECT}.chain.pem" "$DIR/chain/${PROJECT}.chain.pem_$(date '+%F_%T').pem"
+fi
 
 
 ## GENERATE A NEW PRIVATE KEY, CSR AND CA CERTIFICATE
@@ -205,7 +207,7 @@ case "$CERT_INPUT" in
     openssl req -nodes -new -newkey rsa:$KEY_SIZE -keyout $KEY -out $CSR -config $CNF;;
   server )
     # Generate CSR and KEY - do not require a password
-    openssl req -nodes -new -newkey rsa:$KEY_SIZE -keyout $KEY -out $CSR -config $CNF;;
+    openssl req -nodes -new -newkey rsa:$KEY_SIZE -keyout $KEY -out $CSR -config $CNF -extensions server_cert;;
 esac
 
 # Confirm the Key was generated and placed in the correct folder before proceeding
@@ -231,11 +233,13 @@ case "$CERT_INPUT" in
   int )
     # Create the Intermediate CA signed by Root
     openssl ca -create_serial -out $CRT -keyfile $KEY_ROOT -extensions v3_ca_has_san -config $CNF -infiles $CSR;
-   # Revert the SSL commonName in the config file for future script sanity
-   sed -i "s#$PROJECT_UPPER Inter CA#_change_me_commonName_#g" $CNF;;
+    # Revert the SSL commonName in the config file for future script sanity
+    sed -i "s#Inter CA $PROJECT_UPPER#_change_me_commonName_#g" $CNF;
+    # Create a certificate chain using the new Inter CA and existing Root CA
+    cat $CRT $CRT_ROOT > "$DIR/chain/${PROJECT}.chain.pem";;
   server )
     # Create the Server certificate
-    openssl ca -create_serial -config $CNF -out $CRT -keyfile $KEY_INT -in $CSR
+    openssl ca -create_serial -config $CNF -extensions server_cert -out $CRT -keyfile $KEY_INT -in $CSR
     # Revert the SSL commonName in the config file for future script sanity
     sed -i "s#$PROJECT_DIR#_change_me_dir_#g" $CNF;
     sed -i "s#$CRT_INT#_change_me_crt_#g" $CNF;
