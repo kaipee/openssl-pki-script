@@ -45,15 +45,15 @@ while true; do
 done
 
 
-## OBTAIN THE CURRENT PROJECT NAME IF CREATING INTERMEDIATE CERTIFICATES (DNM, TOTUS, etc.)
+## OBTAIN THE CURRENT PROJECT NAME IF CREATING INTERMEDIATE CERTIFICATES 
 function chooseProject() {
   while true; do
     clear
 
     read -p \
 "Please choose a project name from the list below.
-1) DNM
-2) TOTUS
+1) PROJECT 1 
+2) PROJECT 2 
 
 Enter a number: " PROJECT_INPUT  
 
