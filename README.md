@@ -11,3 +11,7 @@ This can be used to (re)generate x509v3 (PKIX) -compliant Root (and Intermediate
 * Re-enter the password to self-sign a new CA
 * Confirm the CA details
 * Repeat for Intermediate and server certificates
+
+# License
+
+Licensed under GNU General Public License v3.0
