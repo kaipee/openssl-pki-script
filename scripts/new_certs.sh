@@ -32,7 +32,7 @@ while true; do
       DIR='../ca/intermediate';
       CNF="$DIR/openssl_${CERT_INPUT}.cnf"
       KEY_ROOT="../ca/root/private/root.ca.key.pem"; # Define the relative path and filename of the Root CA Private Key (used for signing Intermediate CSR)
-      CRT_ROOT="../ca/root/private/root.ca.crt.pem"; # Define the relative path and filename of the Root CA certificate (for creating chain)
+      CRT_ROOT="../ca/root/certs/root.ca.crt.pem"; # Define the relative path and filename of the Root CA certificate (for creating chain)
       DEF_KEY_SIZE="2048";
       break;;
     server )
